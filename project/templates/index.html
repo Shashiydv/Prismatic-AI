@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prismatic AI - Login</title>
+    <style>
+        :root { --primary: #6366f1; --bg: #0f172a; --glass: rgba(255, 255, 255, 0.05); }
+        body { margin: 0; font-family: 'Segoe UI', sans-serif; background: var(--bg); color: white; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
+        .blob { position: absolute; filter: blur(80px); opacity: 0.4; z-index: -1; }
+        .blob-1 { top: -10%; left: -10%; width: 500px; height: 500px; background: #4338ca; border-radius: 50%; }
+        .blob-2 { bottom: -10%; right: -10%; width: 400px; height: 400px; background: #be185d; border-radius: 50%; }
+        .login-card { background: var(--glass); backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.1); padding: 2.5rem; border-radius: 1rem; width: 320px; box-shadow: 0 4px 30px rgba(0,0,0,0.5); }
+        h2 { text-align: center; margin-bottom: 1.5rem; color: var(--primary); }
+        input { width: 100%; padding: 12px; background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: white; margin-bottom: 1rem; box-sizing: border-box; }
+        input:focus { border-color: var(--primary); outline: none; }
+        button { width: 100%; padding: 12px; background: var(--primary); border: none; border-radius: 6px; color: white; font-weight: bold; cursor: pointer; transition: 0.3s; }
+        button:hover { background: #4f46e5; transform: translateY(-2px); }
+        .message { margin-top: 1rem; text-align: center; font-size: 0.9rem; min-height: 20px; }
+        .success { color: #4ade80; } .error { color: #f87171; }
+        .footer-links { text-align: center; margin-top: 1.5rem; font-size: 0.8rem; color: #94a3b8; }
+        .footer-links a { color: var(--primary); text-decoration: none; cursor: pointer; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+
+    <div class="login-card">
+        <h2 id="formTitle">System Login</h2>
+        <form id="authForm">
+            <input type="text" id="username" placeholder="Username" required>
+            <input type="password" id="password" placeholder="Password" required>
+            <button type="submit" id="submitBtn">Login</button>
+        </form>
+        <div class="message" id="messageBox"></div>
+        
+        <div class="footer-links">
+            <span id="toggleText">New user? </span>
+            <a id="toggleBtn" onclick="toggleMode()">Sign Up</a>
+        </div>
+    </div>
+
+    <script>
+        let isLoginMode = true;
+        // ✅ Port 8001 par update kiya gaya hai backend ke saath sync karne ke liye
+        const apiBase = "http://127.0.0.1:8001";
+
+        function toggleMode() {
+            isLoginMode = !isLoginMode;
+            document.getElementById('formTitle').innerText = isLoginMode ? "System Login" : "Create Account";
+            document.getElementById('submitBtn').innerText = isLoginMode ? "Login" : "Sign Up";
+            document.getElementById('toggleBtn').innerText = isLoginMode ? "Sign Up" : "Login";
+            document.getElementById('toggleText').innerText = isLoginMode ? "New user? " : "Already have an account? ";
+            document.getElementById('messageBox').innerText = "";
+        }
+
+        document.getElementById('authForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('submitBtn');
+            const msgBox = document.getElementById('messageBox');
+            
+            btn.innerText = "Processing...";
+            msgBox.innerText = "";
+
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const endpoint = isLoginMode ? "/login" : "/signup";
+
+            try {
+                const response = await fetch(apiBase + endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password }) 
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    if (isLoginMode) {
+                        msgBox.innerText = "Success! Redirecting...";
+                        msgBox.className = "message success";
+                        // Token aur Username dono save kar rahe hain dashboard ke liye
+                        localStorage.setItem('token', data.token);
+                        localStorage.setItem('username', data.username);
+                        setTimeout(() => {
+                            window.location.href = "dashboard.html";
+                        }, 1000);
+                    } else {
+                        msgBox.innerText = "Account Created! Now please Login.";
+                        msgBox.className = "message success";
+                        setTimeout(() => toggleMode(), 1500);
+                    }
+                } else {
+                    msgBox.innerText = data.detail || "Error occurred";
+                    msgBox.className = "message error";
+                }
+            } catch (error) {
+                msgBox.innerText = "Server Error. Restart your Python script (Port 8001)!";
+                msgBox.className = "message error";
+            } finally {
+                btn.innerText = isLoginMode ? "Login" : "Sign Up";
+            }
+        });
+    </script>
+</body>
+</html>

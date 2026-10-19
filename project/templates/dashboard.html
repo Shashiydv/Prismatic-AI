@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prismatic AI - Workspace</title>
+    <style>
+        :root { --primary: #6366f1; --bg: #0f172a; --glass: rgba(255, 255, 255, 0.05); }
+        body { margin: 0; font-family: 'Segoe UI', sans-serif; background: var(--bg); color: white; display: flex; height: 100vh; overflow: hidden; }
+        
+        /* Sidebar Styling */
+        .sidebar { width: 260px; background: rgba(0,0,0,0.3); padding: 20px; display: flex; flex-direction: column; border-right: 1px solid rgba(255,255,255,0.1); }
+        .sidebar h2 { color: var(--primary); font-size: 1.5rem; margin-bottom: 25px; display: flex; align-items: center; gap: 10px; }
+        .user-info { padding: 15px; background: var(--glass); border-radius: 10px; margin-bottom: 20px; border: 1px solid rgba(255,255,255,0.1); }
+        .user-info span { color: #4ade80; font-weight: bold; }
+        .agent-list { font-size: 0.8rem; color: #94a3b8; line-height: 1.8; }
+        .logout-btn { margin-top: auto; padding: 12px; background: #ef4444; border: none; color: white; cursor: pointer; border-radius: 8px; font-weight: bold; transition: 0.3s; }
+        .logout-btn:hover { background: #dc2626; }
+
+        /* Main Chat Design */
+        .main-content { flex: 1; display: flex; flex-direction: column; padding: 20px; max-width: 1100px; margin: 0 auto; width: 100%; }
+        .chat-box { flex: 1; overflow-y: auto; background: var(--glass); border-radius: 15px; padding: 20px; margin-bottom: 20px; display: flex; flex-direction: column; gap: 15px; border: 1px solid rgba(255,255,255,0.1); }
+        
+        /* Message Bubbles */
+        .message { padding: 12px 18px; border-radius: 12px; max-width: 80%; line-height: 1.6; font-size: 0.95rem; position: relative; }
+        .user-msg { background: var(--primary); align-self: flex-end; box-shadow: 0 4px 15px rgba(99, 102, 241, 0.2); }
+        .ai-msg { background: rgba(255,255,255,0.08); align-self: flex-start; border: 1px solid rgba(255,255,255,0.1); }
+        
+        /* Agent Info Tag */
+        .agent-badge { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 1px; color: var(--primary); font-weight: 800; display: block; margin-bottom: 5px; }
+
+        /* Media Handling */
+        .ai-img { width: 100%; max-width: 500px; border-radius: 10px; margin-top: 10px; border: 2px solid var(--primary); cursor: zoom-in; transition: 0.3s; }
+        .ai-img:hover { transform: scale(1.01); }
+
+        /* Input Area */
+        .input-area { display: flex; gap: 12px; background: rgba(0,0,0,0.2); padding: 12px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); }
+        input { flex: 1; background: transparent; border: none; color: white; outline: none; font-size: 1rem; }
+        button#sendBtn { padding: 10px 25px; background: var(--primary); border: none; border-radius: 8px; color: white; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        button#sendBtn:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(99,102,241,0.4); }
+
+        .typing { font-size: 0.8rem; color: #94a3b8; display: none; margin-bottom: 10px; margin-left: 5px; }
+    </style>
+</head>
+<body>
+
+    <div class="sidebar">
+        <h2>🤖 Prismatic</h2>
+        <div class="user-info">
+            Welcome back,<br><span id="displayUser">Shashi Ranjan</span>
+        </div>
+        <div class="agent-list">
+            <b>System Status:</b><br>
+            ✍️ Writing Agent: Online<br>
+            💻 Coding Agent: Online<br>
+            🎨 Artist Agent: Online
+        </div>
+        <button class="logout-btn" onclick="logout()">Logout</button>
+    </div>
+
+    <div class="main-content">
+        <div class="chat-box" id="chatBox">
+            <div class="message ai-msg">
+                <span class="agent-badge">System</span>
+                Hello! Prismatic AI is online. I can help you with coding, writing, or generating creative images.
+            </div>
+        </div>
+        <div class="typing" id="typingIndicator">Prismatic is thinking...</div>
+        <div class="input-area">
+            <input type="text" id="userInput" placeholder="Ask anything or 'Generate an image of...'" onkeypress="if(event.key==='Enter') sendMessage()">
+            <button id="sendBtn" onclick="sendMessage()">Send</button>
+        </div>
+    </div>
+
+    <script>
+        const username = localStorage.getItem('username') || "User";
+        document.getElementById('displayUser').innerText = username;
+
+        // Redirect if no token
+        if (!localStorage.getItem('token')) { window.location.href = 'index.html'; }
+
+        function logout() {
+            localStorage.clear();
+            window.location.href = 'index.html';
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('userInput');
+            const chatBox = document.getElementById('chatBox');
+            const typing = document.getElementById('typingIndicator');
+            const text = input.value.trim();
+
+            if (!text) return;
+
+            // 1. Display User Message
+            chatBox.innerHTML += `<div class="message user-msg">${text}</div>`;
+            input.value = "";
+            chatBox.scrollTop = chatBox.scrollHeight;
+            typing.style.display = "block";
+
+            try {
+                // 2. Fetch from Python Backend
+                const response = await fetch('http://127.0.0.1:8000/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: text, username: username })
+                });
+
+                const data = await response.json();
+                let aiHtml = "";
+                
+                // Agent identification
+                const agent = data.agent_used ? data.agent_used.toUpperCase() : "GENERAL";
+
+                // 3. Handle Text vs Image Response
+                if (data.media_type === "image") {
+                    aiHtml = `
+                        <div class="message ai-msg">
+                            <span class="agent-badge">🎨 ${agent} Agent</span>
+                            ${data.reply}
+                            <br>
+                            <img src="${data.url}" class="ai-img" onclick="window.open('${data.url}')">
+                        </div>`;
+                } else {
+                    // Simple logic for multiline code/text
+                    const cleanText = data.reply.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+                    aiHtml = `
+                        <div class="message ai-msg">
+                            <span class="agent-badge">🤖 ${agent} Agent</span>
+                            <div style="white-space: pre-wrap;">${cleanText}</div>
+                        </div>`;
+                }
+
+                chatBox.innerHTML += aiHtml;
+
+            } catch (error) {
+                console.error("Error:", error);
+                chatBox.innerHTML += `<div class="message ai-msg" style="color:#f87171">Connection Error: Is the server running?</div>`;
+            } finally {
+                typing.style.display = "none";
+                chatBox.scrollTop = chatBox.scrollHeight;
+            }
+        }
+    </script>
+</body>
+</html>
